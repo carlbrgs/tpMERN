@@ -1,113 +1,143 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-const EditAnnonce = () => {
-  const [title, setTitle] = useState("");
-  const [image, setImage] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
-  const [message, setMessage] = useState("");
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(";").shift();
+  return null;
+};
 
+const AnnonceEdit = ({ annonce, onSave, onClose }) => {
+  const [title, setTitle] = useState(annonce.title);
+  const [image, setImage] = useState(annonce.image);
+  const [description, setDescription] = useState(annonce.description);
+  const [category, setCategory] = useState(annonce.category);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [token, setToken] = useState("");
+
+  // useEffect pour récupérer le token au chargement
   useEffect(() => {
-    const checkAuth = async () => {
-      const getCookie = (name) => {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(";").shift();
-      };
-
-      const token = getCookie("token");
-
-      if (!token) {
-        alert("You must be logged in to edit an annonce.");
-        window.location.href = "/login";
-        return;
-      }
-
-      try {
-        const response = await axios.get("http://localhost:3000/user/check", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.data.authenticated) {
-          alert("You must be logged in to edit an annonce.");
-          window.location.href = "/login";
-        }
-      } catch (err) {
-        console.error("Authentication check failed:", err);
-        alert("You must be logged in to edit an annonce.");
-        window.location.href = "/login";
-      }
-    };
-
-    checkAuth();
+    const token = getCookie("token");
+    if (!token) {
+      setError("You are not authenticated. Please log in again.");
+    } else {
+      setToken(token);
+    }
   }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSave = async () => {
+    setLoading(true);
+    setError("");
+
     try {
-      await axios.put("http://localhost:5000/api/annonces/1", {
+      const updatedAnnonce = {
         title,
         image,
         description,
         category,
-      }, { withCredentials: true });
-      setMessage("Annonce updated successfully");
+      };
+
+      if (!token) {
+        setError("You are not authenticated. Please log in again.");
+        setLoading(false);
+        return;
+      }
+
+      await axios.put(
+        `http://localhost:3000/annonce/update/${annonce._id}`,
+        updatedAnnonce,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          withCredentials: true,
+        }
+      );
+
+      onSave(updatedAnnonce); // Callback pour mettre à jour la liste
+      onClose(); // Ferme le modal
     } catch (err) {
-      setMessage("Failed to update annonce");
-      console.error("Error updating annonce:", err);
+      setError("Failed to update the annonce. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="card mx-auto" style={{ maxWidth: "600px" }}>
-      <div className="card-body">
-        <h1 className="card-title text-center">Edit Annonce</h1>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="form-label">Title:</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Enter the title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
+    <div className="modal show d-block" tabIndex="-1" role="dialog">
+      <div className="modal-dialog" role="document">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title">Edit Annonce</h5>
+            <button
+              type="button"
+              className="btn-close"
+              onClick={onClose}
+              disabled={loading}
+            ></button>
           </div>
-          <div className="mb-3">
-            <label className="form-label">Image URL:</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Enter the image URL"
-              value={image}
-              onChange={(e) => setImage(e.target.value)}
-            />
+          <div className="modal-body">
+            <div className="mb-3">
+              <label className="form-label">Title</label>
+              <input
+                type="text"
+                className="form-control"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Image URL</label>
+              <input
+                type="text"
+                className="form-control"
+                value={image}
+                onChange={(e) => setImage(e.target.value)}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Description</label>
+              <textarea
+                className="form-control"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              ></textarea>
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Category</label>
+              <input
+                type="text"
+                className="form-control"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+            </div>
+            {error && <p className="text-danger">{error}</p>}
           </div>
-          <div className="mb-3">
-            <label className="form-label">Description:</label>
-            <textarea
-              className="form-control"
-              placeholder="Enter the description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            ></textarea>
+          <div className="modal-footer">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onClose}
+              disabled={loading}
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleSave}
+              disabled={loading}
+            >
+              {loading ? "Saving..." : "Save Changes"}
+            </button>
           </div>
-          <div className="mb-3">
-            <label className="form-label">Category:</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Enter the category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            />
-          </div>
-          <button type="submit" className="btn btn-success w-100">Save Changes</button>
-          {message && <p className="text-success mt-3 text-center">{message}</p>}
-        </form>
+        </div>
       </div>
     </div>
   );
 };
 
-export default EditAnnonce;
+export default AnnonceEdit;
